@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Balaji Bhakt Niwas - Room Availability</title>
+    <!-- Tailwind CSS for mobile-optimized layouts -->
+    <script src="https://jsdelivr.net"></script>
+    <link rel="stylesheet" href="https://cloudflare.com">
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans antialiased pb-16">
+
+    <!-- Header Section -->
+    <header class="bg-amber-600 text-white py-6 px-4 text-center shadow-md sticky top-0 z-50">
+        <h1 class="text-2xl font-bold tracking-wide">🚩 BALAJI BHAKT NIWAS 🚩</h1>
+        <p class="text-sm opacity-90 mt-1">Akkalkot • Scan to View Live Rooms</p>
+    </header>
+
+    <!-- Address & Business Details Card -->
+    <main class="max-w-md mx-auto px-4 mt-6">
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100 mb-6">
+            <h2 class="font-bold text-amber-700 mb-1 text-sm uppercase tracking-wider">📍 Address & Location</h2>
+            <p class="text-gray-700 font-medium text-sm mb-3">
+                Behind Balaji Xerox, Station Road, Akkalkot.
+            </p>
+            <div class="flex flex-col gap-2 pt-3 border-t border-gray-100 text-xs text-gray-600">
+                <div class="flex items-center gap-2">
+                    <span class="text-amber-600 font-bold">✔</span> 24/7 Pure Water & Power Backup
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-amber-600 font-bold">✔</span> Clean Bathrooms & Safe Premises
+                </div>
+                <div class="flex items-center gap-2 mt-1 font-semibold text-gray-800">
+                    <i class="fas fa-phone-alt text-amber-600"></i> Contact: +91 9545053229
+                </div>
+            </div>
+        </div>
+
+        <!-- Dynamic Rooms Container -->
+        <h3 class="font-bold text-gray-700 mb-3 text-lg">Our Rooms</h3>
+        <div id="rooms-loading" class="text-center py-8 text-gray-500 font-medium">
+            <div class="animate-spin inline-block w-6 h-6 border-[3px] border-current border-t-transparent text-amber-600 rounded-full mb-2"></div>
+            <p>Fetching live room availability...</p>
+        </div>
+        <div id="rooms-list" class="space-y-4 hidden">
+            <!-- Rooms dynamically inject here -->
+        </div>
+    </main>
+
+    <!-- Script Configurations -->
+    <script>
+        // LIVE GOOGLE SHEET URL INTEGRATED
+        const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSERM4MWOupHL-bqsKQCYcCtYBNH5qkra13FSqT10kzZYpNtXwXb7QWFH0RuqE8lSsuzSeh-kfvwkvQ/pub?output=csv";
+        
+        // YOUR INTEGRATED WHATSAPP CONTACT 
+        const WHATSAPP_NUMBER = "919545053229"; 
+
+        async function fetchRooms() {
+            try {
+                const response = await fetch(GOOGLE_SHEET_CSV_URL);
+                const data = await response.text();
+                
+                // Helper to cleanly handle CSV parsing (including handling commas inside quotes for prices)
+                const lines = data.split("\n").map(line => {
+                    const result = [];
+                    let current = '';
+                    let inQuotes = false;
+                    for (let i = 0; i < line.length; i++) {
+                        let char = line[i];
+                        if (char === '"') {
+                            inQuotes = !inQuotes;
+                        } else if (char === ',' && !inQuotes) {
+                            result.push(current.trim());
+                            current = '';
+                        } else {
+                            current += char;
+                        }
+                    }
+                    result.push(current.trim());
+                    return result;
+                });
+                
+                let rooms = [];
+                // Start from index 1 to skip column headers
+                for(let i = 1; i < lines.length; i++) {
+                    if(lines[i].length >= 3 && lines[i][0] !== "") {
+                        rooms.push({
+                            id: i,
+                            name: lines[i][0],
+                            status: lines[i][1],
+                            price: lines[i][2],
+                            desc: lines[i][3] || "Clean and comfortable room setup.",
+                            // Automatically maps to image files based on room order (e.g., images/room1.jpg)
+                            image: `images/room${i}.jpg` 
+                        });
+                    }
+                }
+
+                renderRooms(rooms);
+            } catch (error) {
+                console.error("Error connecting with Google Data spreadsheet sources:", error);
+                document.getElementById('rooms-loading').innerText = "Failed to load live data. Please check your sheet visibility.";
+            }
+        }
+
+        function renderRooms(rooms) {
+            const container = document.getElementById('rooms-list');
+            container.innerHTML = '';
+            
+            rooms.forEach(room => {
+                const isAvailable = room.status.toLowerCase() === 'available';
+                const badgeColor = isAvailable ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+                
+                const message = encodeURIComponent(`Hello Balaji Bhakt Niwas! I scanned your QR code and would like to book the *${room.name}* (${room.price}). Is it open for check-in right now?`);
+                const whatsappUrl = `https://wa.me{WHATSAPP_NUMBER}?text=${message}`;
+
+                const cardHTML = `
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                        <!-- Image Layout Frame -->
+                        <div class="h-48 w-full bg-gray-200 relative">
+                            <img src="${room.image}" alt="${room.name}" class="w-full h-full object-cover" onerror="this.onerror=null; this.src='https://unsplash.com';">
+                            <span class="absolute top-3 right-3 px-2.5 py-1 text-xs font-bold rounded-full shadow-sm ${badgeColor}">
+                                ${room.status}
+                            </span>
+                        </div>
+                        
+                        <div class="p-4">
+                            <h4 class="font-bold text-gray-900 text-base leading-tight mb-1">${room.name}</h4>
+                            <p class="text-xs text-gray-500 mb-3">${room.desc}</p>
+                            <div class="flex items-center justify-between pt-3 border-t border-gray-50">
+                                <div>
+                                    <span class="text-[10px] text-gray-400 block uppercase font-bold">Rate</span>
+                                    <span class="text-lg font-black text-amber-700">${room.price}</span>
+                                </div>
+                                <a href="${whatsappUrl}" target="_blank" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg font-bold text-white transition-colors text-xs ${isAvailable ? 'bg-green-600 hover:bg-green-700 shadow-md shadow-green-100' : 'bg-gray-600' exchange}">
+                                    <i class="fab fa-whatsapp"></i>
+                                    ${isAvailable ? 'Book on WhatsApp' : 'Check Availability'}
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.innerHTML += cardHTML;
+            });
+
+            document.getElementById('rooms-loading').classList.add('hidden');
+            container.classList.remove('hidden');
+        }
+
+        fetchRooms();
+    </script>
+</body>
+</html>
